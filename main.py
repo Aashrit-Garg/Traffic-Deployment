@@ -8,6 +8,11 @@ import sys
 import tensorflow as tf
 from sklearn.model_selection import train_test_split
 
+from PIL import Image
+from io import BytesIO
+
+import traceback
+
 MODEL = tf.keras.models.load_model("trafficModel/")
 
 app = FastAPI()
@@ -27,22 +32,34 @@ def index():
     x_train, x_test, y_train, y_test = train_test_split(
         np.array(images), np.array(labels), test_size=TEST_SIZE
     )
+    print(x_test.shape)
     loss, acc = MODEL.evaluate(x_test, y_test, verbose=2)
     return {"Hello": "Restored model, accuracy: {:5.2f}%".format(100 * acc)}
 
 
 @app.post("/predict")
-async def create_upload_file(file: Optional[UploadFile] = None):
+async def predict(file: Optional[UploadFile] = None):
     if not file:
         return {"message": "No upload file sent"}
     else:
-        images, labels = load_data("gtsrb")
-        labels = tf.keras.utils.to_categorical(labels)
-        x_train, x_test, y_train, y_test = train_test_split(
-            np.array(images), np.array(labels), test_size=TEST_SIZE
+        print(file.filename)
+        img = await file.read()
+        with open('sample.ppm', "wb+") as file_object:
+            file_object.write(img)
+
+        x_img = cv2.imread('sample.ppm')
+        print(type(x_img), x_img.shape)
+        res = cv2.resize(
+            x_img, dsize=(IMG_HEIGHT, IMG_WIDTH), interpolation=cv2.INTER_AREA
         )
-        prediction = MODEL.predict(x_test).shape
-        return {"prediction": prediction}
+        print(type(res), res.shape, np.array([res]).shape)
+        try:
+            prediction = MODEL.predict(np.array([res]))
+            print(np.argmax(prediction, axis=1))
+            return {"prediction": str(np.argmax(prediction, axis=1))}
+        except Exception:
+            print(traceback.format_exc())
+        return {"prediction": "prediction"}
 
 
 def load_data(data_dir):
