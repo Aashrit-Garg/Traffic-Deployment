@@ -1,0 +1,4 @@
+gtsrb/
+venv/
+.vscode/
+__pycache__/
